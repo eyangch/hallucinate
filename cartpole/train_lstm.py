@@ -9,8 +9,8 @@ import numpy as np
 from config import device, lat
 import modal
 
-app = modal.App("qwop")
-vol = modal.Volume.from_name("qwop", create_if_missing=True)
+app = modal.App("cartpole")
+vol = modal.Volume.from_name("cartpole", create_if_missing=True)
 
 image = modal.Image.debian_slim().pip_install("torch", "numpy", "pillow").add_local_python_source("config", "models")
 
@@ -28,10 +28,11 @@ def weighted_mse(output, label, weights):
 def unweighted_mse(output, label, weights):
     return torch.mean((output - label) ** 2)
 
-@app.function(volumes={"/qwop": vol}, image=image, gpu="L4", timeout=900)
-def train_lstm(batch_size=32, k=100):
+@app.function(volumes={"/cartpole": vol}, image=image, gpu="L4", timeout=2000)
+def train_lstm(batch_size=32, k=15):
     try:
-        model_lstm = models.load_lstm("/qwop/model_lstm_16_interp.torch").to(device)
+        #raise Exception
+        model_lstm = models.load_lstm("/cartpole/model_lstm_8_interp.torch").to(device)
     except:
         model_lstm = GameLSTM().to(device)
 
@@ -44,7 +45,7 @@ def train_lstm(batch_size=32, k=100):
         data_generated += 1
         print(f"DATA GENERATION {data_generated}:")
         t_start = time.time()
-        enc_lstm_images, lstm_keys = load_np_abs("/qwop/img_enc.gz"), load_np_abs("/qwop/key_enc.gz")
+        enc_lstm_images, lstm_keys = load_np_abs("/cartpole/img_enc.gz"), load_np_abs("/cartpole/key_enc.gz")
 
         diffs = np.reshape(enc_lstm_images[:,:-1] - enc_lstm_images[:,1:], (-1, lat))
         mu_diff = np.mean(diffs, axis=0)
@@ -59,7 +60,7 @@ def train_lstm(batch_size=32, k=100):
         lstm_key_tensor = torch.tensor(lstm_keys, dtype=torch.float32).to(device)
 
         encoded_img_output = encoded_img_tensor[:,1:,:]
-        encoded_img_input = torch.cat((encoded_img_tensor, lstm_key_tensor), dim=-1)[:,:-1,:]
+        encoded_img_input = torch.cat((encoded_img_tensor, lstm_key_tensor[:, :, None]), dim=-1)[:,:-1,:]
 
         print(encoded_img_input.shape)
         print(encoded_img_output.shape)
@@ -82,8 +83,6 @@ def train_lstm(batch_size=32, k=100):
 
         epoch = 0
 
-        teach_rate = 1.0
-
         while True:
             t_epoch = time.time()
             train_loss = 0
@@ -91,11 +90,10 @@ def train_lstm(batch_size=32, k=100):
             for i, (image, label) in enumerate(batch_train):
                 model_lstm.zero_hidden()
 
-                mult = torch.randn(image.shape).to(device) * 0.10 * torch.cat((sigma_diff, torch.zeros(4).to(device))).to(device)
+                mult = torch.randn(image.shape).to(device) * 0.10 * torch.cat((sigma_diff, torch.zeros(1).to(device))).to(device)
                 noised_image = image + mult
 
-                if teach_rate == 1:
-                    lstm_output = mu_diff + model_lstm(noised_image) * sigma_diff + noised_image[:,:,:lat]
+                lstm_output = mu_diff + model_lstm(noised_image) * sigma_diff + noised_image[:,:,:lat]
 
                 base_output = noised_image[:,:,:lat]
                 loss = weighted_mse(lstm_output, label, 1/sigma_diff)
@@ -138,17 +136,13 @@ def train_lstm(batch_size=32, k=100):
             print(f"Finished training epoch in {time.time() - t_epoch}")
             print(f"Scheduler LR: {scheduler.get_last_lr()}")
             print("-------------------")
-            
-            if test_loss < 0.0:
-                teach_rate *= 0.9
-                print(f"NEW TEACH RATE: {teach_rate}")
 
             if epoch % 2 == 0:
                 print("SAVING")
-                torch.save(model_lstm.state_dict(), "/qwop/model_lstm_16_interp.torch")
+                torch.save(model_lstm.state_dict(), "/cartpole/model_lstm_8_interp.torch")
 
-            if epoch > 10000:
-                break
+            if epoch >= 40:
+                return
 
 def upload_data(override=False):
     files = [x.path for x in vol.listdir("/")]
@@ -162,7 +156,7 @@ def upload_data(override=False):
 @app.local_entrypoint()
 def main():
     print("Uploading")
-    upload_data(False)
+    upload_data(True)
     print("Finished Uploading")
     train_lstm.remote()
 
