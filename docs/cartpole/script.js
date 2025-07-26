@@ -179,20 +179,20 @@ async function main(){
 
 main();
 
-for(const c of ["left", "right"]){
+for(const c of ["left", "right", 'r']){
     const btn = document.getElementById(c);
     const keyCode = (c === "left") ? 0x25 : 0x27;
     btn.addEventListener("mousedown", () => {
-        processKeyDown({"keyCode": keyCode});
+        processKeyDown({"keyCode": keyCode, "key": c});
     });
     btn.addEventListener("mouseup", () => {
-        processKeyUp({"keyCode": keyCode});
+        processKeyUp({"keyCode": keyCode, "key": c});
     });
     btn.addEventListener("touchstart", () => {
-        processKeyDown({"keyCode": keyCode});
+        processKeyDown({"keyCode": keyCode, "key": c});
     });
     btn.addEventListener("touchend", () => {
-        processKeyUp({"keyCode": keyCode});
+        processKeyUp({"keyCode": keyCode, "key": c});
     });
 }
 
