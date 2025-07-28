@@ -70,12 +70,15 @@ async def gen_raw(folder="data", end_time=-1):
             print(sample_data.shape)
             print(sample_keys.shape)
 
-        if sample_data.shape[0] % 3000 == 0:
+        if sample_data.shape[0] % 9000 == 0:
             save_np(f"img_{sample_data.shape[0]}.gz", sample_data, folder)
             save_np(f"key_{sample_keys.shape[0]}.gz", sample_keys, folder)
 
-        save_np(f"img_dat.gz", sample_data, folder)
-        save_np(f"key_dat.gz", sample_keys, folder)
+        if sample_data.shape[0] % 3000 == 0:
+            save_np(f"img_dat.gz", sample_data, folder)
+            save_np(f"key_dat.gz", sample_keys, folder)
+
+        
 
 
 async def gen_enc(model_ae: AE, folder="data", end_time=-1):

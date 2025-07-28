@@ -27,7 +27,7 @@ def convert_data(raw_data):
 
 @app.function(volumes={"/cartpole": vol}, image=image, gpu="L4", timeout=2000)
 def train():
-    sample_data = load_np_abs("/cartpole/img_dat.gz")
+    sample_data = load_np_abs("/cartpole/img_dat.gz")[25500:]
     print(sample_data.shape)
     
     try:
@@ -84,7 +84,7 @@ def train():
     
     model.train()
 
-    optimizer = optim.AdamW(model.parameters(), lr=3e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=1e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 40)
 
     def generate_data(batch_size, k):
